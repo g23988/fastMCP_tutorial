@@ -1,0 +1,2294 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>第一堂課：等等,這不就是 API 嗎? — MCP / FastMCP 入門</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+<div class="layout">
+
+    <!-- ============================================================
+         SIDEBAR — Table of Contents
+         ============================================================ -->
+    <aside class="sidebar">
+        <h2>目錄</h2>
+        <ul class="toc">
+            <li><a href="#ch0">0. 等等,這不就是 API 嗎?</a></li>
+            <li><a href="#ch1">1. 模型不是不聰明,是碰不到你的系統</a></li>
+            <li><a href="#ch2">2. 我們需要一種共同語言</a></li>
+            <li><a href="#ch3">3. 連接線一多,系統就開始失控</a></li>
+            <li><a href="#ch4">4. 誰在跟誰說話?Host、Client、Server</a></li>
+            <li><a href="#ch5">5. Server 到底可以拿出什麼?</a></li>
+            <li><a href="#ch6">6. 一次 MCP 呼叫怎麼發生?</a></li>
+            <li><a href="#ch7">7. 三個很像但不同層的東西</a></li>
+            <li><a href="#ch8">8. Server 住在哪裡?stdio 與 HTTP</a></li>
+            <li><a href="#ch9">9. FastMCP:你終於要寫的那段 Python</a></li>
+            <li><a href="#ch10">10. 設計 MCP 能力:從任務開始</a></li>
+            <li><a href="#ch11">11. 安全:MCP 不會自動替你做權限設計</a></li>
+            <li><a href="#ch12">12. 什麼適合做 MCP server?</a></li>
+            <li><a href="#ch13">13. 練習:判斷 Tool/Resource/Prompt</a></li>
+            <li><a href="#ch14">14. 練習:修正壞 tool</a></li>
+            <li><a href="#ch15">15. 第一堂課建議安排</a></li>
+            <li><a href="#ch16">16. FastMCP 工作坊:3.5 小時版本</a></li>
+            <li><a href="#ch17">17. 課程總路線</a></li>
+            <li><a href="#ch18">18. 講師備忘</a></li>
+            <li><a href="#ch19">19. 一頁式總結</a></li>
+            <li><a href="#ch20">20. 課後作業與評量</a></li>
+            <li><a href="#ch21">21. 常見誤解</a></li>
+            <li><a href="#ch22">22. 三個完整案例</a></li>
+            <li><a href="#ch23">23. MCP Server 設計檢查表</a></li>
+            <li><a href="#ch24">24. 課堂互動問題</a></li>
+            <li><a href="#ch25">25. 銜接實作課的 Demo</a></li>
+            <li><a href="#ch26">26. 術語表</a></li>
+            <li><a href="#ch27">27. 參考來源</a></li>
+        </ul>
+    </aside>
+
+    <!-- ============================================================
+         CONTENT
+         ============================================================ -->
+    <main class="content">
+
+        <header class="book-header">
+            <span class="chapter-num">第一堂課</span>
+            <h1>等等,這不就是 API 嗎?</h1>
+            <p class="book-subtitle">
+                目標讀者:已經會 Python、會寫 API 或後端服務,接下來要在幾小時內快速學會用 FastMCP 開發 MCP server 的工程師。
+            </p>
+            <p>
+                這一章先不急著背名詞。你會先遇到一個熟悉的工程問題,然後一步一步拆開:為什麼「讓 AI 打 API」不是完整答案,以及 MCP 到底補上了哪一塊。
+            </p>
+        </header>
+
+        <hr>
+
+        <!-- ========== Chapter 0 ========== -->
+        <section id="ch0">
+            <span class="chapter-num">Chapter 0</span>
+            <h2>等等,這不就是 API 嗎?</h2>
+
+            <p>你正在公司裡做一個 AI 助理。產品經理走過來,說:</p>
+
+            <blockquote>
+                <p>我希望它可以幫客服查訂單、看退款政策、建立 ticket。另外,工程師也想用它查 deployment 狀態。</p>
+            </blockquote>
+
+            <p>你想了一下。這些東西公司都有 API。</p>
+
+            <p>所以你的第一個反應很自然:</p>
+
+            <blockquote>
+                <p>那我把 API 文件丟給 AI,或讓 AI 直接打 API,不就好了?</p>
+            </blockquote>
+
+            <p>先不要急著寫 code。這正是 MCP 出現的地方。</p>
+
+            <h3>0.1 API 對程式很清楚,對 AI 不一定清楚</h3>
+
+            <p>API 文件通常告訴程式:</p>
+
+            <pre class="ascii">endpoint 是什麼
+HTTP method 是什麼
+body 長什麼樣子
+response 長什麼樣子</pre>
+
+            <p>這些對一般程式足夠。但是 AI client 還需要知道另一組問題:</p>
+
+            <pre class="ascii">這個能力是拿來完成什麼任務?
+什麼時候該用?
+需要哪些參數?
+哪些參數不能亂填?
+這個操作會不會改資料?
+結果能不能直接拿來回答使用者?
+這個操作需要使用者確認嗎?
+誰有權限使用?</pre>
+
+            <p>REST API 比較像在說:「你可以怎麼呼叫我。」</p>
+            <p>MCP 還要說:「我是什麼能力。什麼時候該用我。怎麼安全地用我。」</p>
+
+            <div class="callout note">
+                <div class="callout-title">轉念 #1</div>
+                <p>API 是給程式呼叫的介面。MCP 是給 AI client 發現、理解、選擇與呼叫能力的介面。</p>
+            </div>
+
+            <h3>0.2 先猜一下</h3>
+
+            <p>下面哪一個比較像好的 MCP tool?</p>
+
+<pre><code class="language-python">def call_api(path: str, method: str, body: dict) -> dict:
+    ...</code></pre>
+
+            <p>還是:</p>
+
+<pre><code class="language-python">def get_order_status(order_id: str) -> dict:
+    ...</code></pre>
+
+            <p>如果你選第二個,你已經抓到 MCP 設計的一半。</p>
+
+            <p>第一個很有彈性,但對 AI 來說太模糊,也太危險。</p>
+
+            <p>第二個比較窄,但語意清楚。AI client 比較容易判斷:</p>
+
+            <ul>
+                <li>什麼時候該用它</li>
+                <li>要傳什麼參數</li>
+                <li>它會回傳什麼</li>
+                <li>它大概不會造成什麼副作用</li>
+            </ul>
+
+            <p>好,現在再看一個。下面哪一個比較像危險的 MCP tool?</p>
+
+<pre><code class="language-python">def refund_customer_payment(customer_id: str, amount: int) -> dict:
+    ...</code></pre>
+
+            <p>還是:</p>
+
+<pre><code class="language-python">def read_refund_policy() -> str:
+    ...</code></pre>
+
+            <p>第一個不是不能做,但它會改變真實世界:錢會出去,資料會改變,客服流程會被觸發。這種 tool 需要權限、確認、審計紀錄,甚至可能不適合第一版就開。</p>
+
+            <p>第二個比較像讀資料。它通常更適合做成 Resource,而不是 Tool。</p>
+
+            <div class="callout note">
+                <div class="callout-title">轉念 #2</div>
+                <p>會寫出能跑的 tool 不難。難的是判斷一個能力應該怎麼被 AI 使用,以及它會不會造成風險。</p>
+            </div>
+
+            <h3>0.3 這堂課不是 MCP 規格導讀</h3>
+
+            <p>你不需要一開始就讀完整個 protocol specification。你也不需要先變成 AI 研究員。</p>
+
+            <p>你已經會的東西其實很多:Python function、API、database query、file I/O、authentication、logging、testing、deployment。</p>
+
+            <p>MCP 要你多學的是另一件事:</p>
+
+            <blockquote>
+                <p>如何把這些 Python 能力,設計成 AI client 可以發現、理解、呼叫,而且可以治理的能力介面。</p>
+            </blockquote>
+
+            <p>FastMCP 則是 Python 工程師進入 MCP 最直接的路徑。你會用 decorator 標記 tools、resources、prompts。你會用 type hints 產生 schema。你會用 docstring 告訴 AI client 這個能力什麼時候該用。</p>
+
+            <div class="callout warning">
+                <div class="callout-title">注意</div>
+                <p>FastMCP 讓你很快寫出 MCP server。它不會自動替你設計出好的 MCP server。</p>
+            </div>
+
+            <h3>0.4 讀完這堂課,你應該能做的事</h3>
+
+            <p>這堂課結束時,你不只是「知道 MCP 是什麼」。你應該能看著一個需求,做出這些判斷:</p>
+
+            <ul>
+                <li>這應該是 Tool、Resource,還是 Prompt?</li>
+                <li>這個能力有沒有 side effect?</li>
+                <li>這個 tool 名稱是否清楚?</li>
+                <li>這些參數對 AI client 來說是否明確?</li>
+                <li>這個能力是否需要權限、確認或審計?</li>
+                <li>這個需求適不適合第一版就開放?</li>
+            </ul>
+
+            <p>如果你能做出這些判斷,後面學 FastMCP 會快很多。因為 FastMCP 的語法很短。真正重要的是你怎麼設計那個 Python function。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 1 ========== -->
+        <section id="ch1">
+            <span class="chapter-num">Chapter 1</span>
+            <h2>模型不是不聰明,是碰不到你的系統</h2>
+
+            <p>大型語言模型很會推理、摘要、轉換格式、產生程式碼,也能理解自然語言需求。但是它有一個根本限制:</p>
+
+            <blockquote>
+                <p>模型本身不會自然知道你公司最新的資料,也不會自然操作你公司的系統。</p>
+            </blockquote>
+
+            <p>它不知道:</p>
+
+            <ul>
+                <li>你資料庫裡今天早上的訂單狀態</li>
+                <li>公司內部最新的退款政策</li>
+                <li>Jira、Linear 或 GitHub issue 的即時內容</li>
+                <li>production deployment 現在是否成功</li>
+                <li>某個客戶上週是否已經聯絡過客服</li>
+                <li>你本機專案裡目前有哪些檔案與測試結果</li>
+            </ul>
+
+            <p>所以在實際產品裡,AI 應用程式一定會遇到一個問題:</p>
+
+            <div class="callout note">
+                <div class="callout-title">核心問題</div>
+                <p>LLM 很會思考,但它需要外部世界的資料、工具與工作流程。</p>
+            </div>
+
+            <p>MCP 就是為這個問題出現的。</p>
+
+            <h3>想像一下</h3>
+
+            <p>你有一位很聰明的助理,但他被關在一間沒有網路、沒有電話、沒有公司系統帳號的房間裡。</p>
+
+            <p>你問他:「幫我查一下客戶 A 的訂單為什麼還沒出貨。」他可以幫你分析「可能原因」,但他不能查資料庫。</p>
+
+            <p>你問他:「幫我開一張 ticket 給工程團隊。」他可以幫你寫 ticket 內容,但他不能真的進 Jira 建立 ticket。</p>
+
+            <p>你問他:「幫我看 production deployment 是否成功。」他可以告訴你一般 deployment 會看什麼,但他不能讀你公司的 deployment 狀態。</p>
+
+            <p>MCP 做的事,就是提供一套標準方式,讓 AI 應用程式可以連上外部系統。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 2 ========== -->
+        <section id="ch2">
+            <span class="chapter-num">Chapter 2</span>
+            <h2>所以,我們需要一種共同語言</h2>
+
+            <p>先不要急著背 MCP 的全名。先看現在的畫面。</p>
+
+            <p>AI client 想幫使用者完成任務,但外面每個系統都有自己的說法:</p>
+
+            <pre class="ascii">PostgreSQL 說:你要寫 SQL。
+Jira 說:你要打我的 REST API。
+GitHub 說:你要照我的 API schema。
+檔案系統說:你要知道路徑。
+公司內部服務說:你要帶 token,照我們的 payload 格式。</pre>
+
+            <p>這些系統對工程師來說不陌生。但是 AI client 不能靠猜。</p>
+
+            <p>它需要一套共同語言來問這些問題:</p>
+
+            <ul>
+                <li>你有哪些能力?</li>
+                <li>這個能力叫什麼?</li>
+                <li>什麼時候該用?</li>
+                <li>需要哪些參數?參數型別是什麼?</li>
+                <li>呼叫後會回來什麼?</li>
+                <li>這個操作會不會改資料?</li>
+                <li>這個操作需要權限或確認嗎?</li>
+            </ul>
+
+            <p>這套共同語言,就是 MCP。</p>
+
+            <p>MCP,全名 Model Context Protocol,是一個開放標準,用來讓 AI 應用程式連接外部資料、工具與工作流程。</p>
+
+            <p>如果說得更貼近 Python 工程師一點:</p>
+
+            <blockquote>
+                <p>MCP 讓你把 Python function、資料來源、內部 API、檔案、工作流程,包成 AI client 可以發現、理解與呼叫的能力。</p>
+            </blockquote>
+
+            <h3>2.1 USB-C 這個比喻有用,但不要想歪</h3>
+
+            <p>你可能會聽過這句話:「MCP 就像 AI 應用程式的 USB-C。」</p>
+
+            <p>這個比喻有用。但重點不是「線」。</p>
+
+            <p>USB-C 的價值不是某一條線本身,而是大家同意一套連接方式。筆電、螢幕、充電器、硬碟,不需要每一組都做一條特製線。</p>
+
+            <p>MCP 的價值也類似。Claude、Cursor、Copilot、ChatGPT、自製 agent,不應該每一個都用完全不同的方式連你的資料庫、ticket 系統、文件系統和內部 API。</p>
+
+            <p>MCP 嘗試把這件事標準化。</p>
+
+            <h3>2.2 MCP 不是你的業務邏輯</h3>
+
+            <p>這點很重要。MCP 不會替你決定:</p>
+
+            <ul>
+                <li>訂單狀態怎麼查</li>
+                <li>退款規則怎麼算</li>
+                <li>誰可以建立 ticket</li>
+                <li>deployment 狀態去哪裡拿</li>
+                <li>哪些資料需要脫敏</li>
+            </ul>
+
+            <p>這些仍然是你的系統設計與業務邏輯。MCP 做的是定義一個標準外層,讓 AI client 可以用一致方式發現和使用這些能力。</p>
+
+            <p>所以你可以這樣分工:</p>
+
+            <table>
+                <thead>
+                    <tr><th>層次</th><th>負責什麼</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>你的 Python code</td><td>真正執行查詢、計算、操作</td></tr>
+                    <tr><td>FastMCP</td><td>把 Python code 包成 MCP server</td></tr>
+                    <tr><td>MCP</td><td>定義 client 和 server 怎麼溝通</td></tr>
+                    <tr><td>AI Host</td><td>決定什麼時候需要使用這些能力</td></tr>
+                </tbody>
+            </table>
+
+            <div class="callout note">
+                <div class="callout-title">記住</div>
+                <p>MCP 不是另一份 API 文件。MCP 是 AI client 和外部系統之間的共同語言。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 3 ========== -->
+        <section id="ch3">
+            <span class="chapter-num">Chapter 3</span>
+            <h2>連接線一多,系統就開始失控</h2>
+
+            <p>一開始,事情看起來很簡單。客服團隊想用 Claude 查訂單。你寫一個 connector。</p>
+
+            <pre class="ascii">Claude -------- 訂單系統</pre>
+
+            <p>沒問題。隔天,工程團隊說:「我們也想在 Cursor 裡查 deployment 狀態。」你又寫一個 connector。</p>
+
+            <pre class="ascii">Cursor -------- Deployment 系統</pre>
+
+            <p>還可以。再過一週,PM 說:「既然都做了,那客服也想查 Jira,工程師也想查 GitHub,營運想查公司知識庫。」</p>
+
+            <p>現在事情開始變得不太一樣。你有 3 個 AI clients(Claude Desktop、Cursor、GitHub Copilot)還有 4 個外部系統(PostgreSQL、Jira、GitHub、公司知識庫)。</p>
+
+            <p>如果沒有共同標準,每個 AI client 都要各自接每個系統:</p>
+
+            <pre class="ascii">3 個 AI clients × 4 個外部系統 = 12 組整合</pre>
+
+            <p>這裡的「12」不是 12 行程式碼。每一組整合都可能包含:authentication、authorization、payload mapping、schema conversion、error handling、retry、rate limit、logging、audit、version upgrade、security review。</p>
+
+            <p>所以你真正維護的不是 12 條線。你維護的是 12 個小型整合產品。</p>
+
+            <h3>3.1 小測驗:新增一個 client 會發生什麼事?</h3>
+
+            <p>現在公司又導入一個新的內部 AI agent。如果沒有 MCP,要讓這個新 agent 使用原本 4 個外部系統,你要新增幾組整合?</p>
+
+            <pre class="ascii">新 agent -> PostgreSQL
+新 agent -> Jira
+新 agent -> GitHub
+新 agent -> 公司知識庫</pre>
+
+            <p>答案是 4 組。如果下個月再新增 2 個外部系統呢?原本的每個 AI client 又要再接一次。</p>
+
+            <p>這就是整合爆炸:</p>
+
+            <div class="callout warning">
+                <div class="callout-title">M × N 問題</div>
+                <p>M 個 AI clients × N 個 tools/data sources = M × N integrations</p>
+            </div>
+
+            <h3>3.2 問題不是會不會寫,是會不會長期維護</h3>
+
+            <p>很多工程師會說:「connector 不難啊,我一天就能寫一個。」也許真的可以。但請想像下面幾件事同時發生:</p>
+
+            <ul>
+                <li>Jira API 改版</li>
+                <li>GitHub token 權限調整</li>
+                <li>公司知識庫換搜尋 API</li>
+                <li>訂單系統新增資料脫敏規則</li>
+                <li>某個 AI client 對錯誤格式有自己的要求</li>
+                <li>安全團隊要求所有查詢都要有 audit log</li>
+            </ul>
+
+            <p>如果每個 client 都各自整合每個系統,這些改動會被放大。一個地方改 authentication,可能要改三個 client。一個 response schema 改掉,可能要修四套 mapping。一個安全規則新增,可能要回頭檢查所有整合。</p>
+
+            <p>這不是程式寫不寫得出來的問題。這是系統邊界設計的問題。</p>
+
+            <h3>3.3 MCP 改變的是整合的形狀</h3>
+
+            <p>有了 MCP,形狀不再是每個 client 接每個系統。而是:</p>
+
+            <ul>
+                <li>AI client 學會說 MCP</li>
+                <li>外部系統透過 MCP server 暴露能力</li>
+            </ul>
+
+            <p>圖像化來看:</p>
+
+            <div class="mermaid">
+graph LR
+    subgraph "沒有 MCP — M × N 整合爆炸"
+        C1[Claude] --> S1[PostgreSQL]
+        C1 --> S2[Jira]
+        C1 --> S3[GitHub]
+        C2[Cursor] --> S1
+        C2 --> S2
+        C2 --> S3
+        C3[Copilot] --> S1
+        C3 --> S2
+        C3 --> S3
+    end
+            </div>
+            <p class="figure-caption">圖 3-1:沒有 MCP 時,每個 AI client 必須各自連接每個系統</p>
+
+            <div class="mermaid">
+graph LR
+    C1[Claude] --> M{MCP}
+    C2[Cursor] --> M
+    C3[Copilot] --> M
+    M --> S1[PostgreSQL Server]
+    M --> S2[Jira Server]
+    M --> S3[GitHub Server]
+    M --> S4[Knowledge Base Server]
+            </div>
+            <p class="figure-caption">圖 3-2:有 MCP 後,兩邊都面向同一個協議</p>
+
+            <p>這不是說整合突然消失。你還是要寫連 PostgreSQL 的程式。你還是要處理 Jira 的 API。你還是要設計權限、錯誤處理和資料格式。</p>
+
+            <p>差別在於:</p>
+
+            <blockquote>
+                <p>你把每個外部系統包成一個標準 MCP server,而不是為每個 AI client 客製一套整合。</p>
+            </blockquote>
+
+            <p>所以複雜度從 <code>M × N</code> 變成比較接近 <code>M + N</code>。每個 AI client 實作 MCP client。每個外部系統實作 MCP server。兩邊都面向同一個協議。</p>
+
+            <h3>3.4 這才是 MCP 對工程師的價值</h3>
+
+            <p>MCP 對工程師最有說服力的地方,不是多了一個新名詞。而是它把問題從「每個 AI app 都要客製接每個系統」改成「每個 AI app 都會說 MCP,每個工具或資料來源都提供 MCP server」。</p>
+
+            <p>這就是為什麼 MCP 不只是 wrapper。它改變的是整合邊界。</p>
+
+            <div class="callout note">
+                <div class="callout-title">核心價值</div>
+                <p>MCP 把 AI 工具整合從一堆客製接線,推向一個可以被發現、呼叫、測試與治理的標準介面。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 4 ========== -->
+        <section id="ch4">
+            <span class="chapter-num">Chapter 4</span>
+            <h2>誰在跟誰說話?Host、Client、Server</h2>
+
+            <p>到這裡,你已經知道 MCP 是共同語言,也知道它可以減少整合爆炸。</p>
+
+            <p>現在要釐清一件很容易混淆的事:</p>
+
+            <blockquote>
+                <p>當你用 FastMCP 開發時,你通常不是在寫 AI app。你是在寫 MCP server。</p>
+            </blockquote>
+
+            <p>先看一個完整畫面。使用者在 Cursor 裡輸入:</p>
+
+            <blockquote>
+                <p>幫我查一下 payment-service 最近一次 deployment 有沒有成功。</p>
+            </blockquote>
+
+            <p>這時候大概會發生:</p>
+
+            <div class="mermaid">
+graph TD
+    U[User] --> H[Cursor — Host]
+    H --> MC[Cursor 裡的 MCP Client]
+    MC --> MS[Deployment MCP Server]
+    MS --> CI[CI/CD API 或內部部署系統]
+            </div>
+            <p class="figure-caption">圖 4-1:一個完整的 MCP 互動鏈</p>
+
+            <p>這張圖裡有三個 MCP 角色。</p>
+
+            <h3>4.1 Host:使用者真正打開的 AI 應用程式</h3>
+
+            <p>Host 是使用者看得到、正在操作的 AI 應用程式。例如:</p>
+
+            <ul>
+                <li>Claude Desktop</li>
+                <li>ChatGPT</li>
+                <li>Cursor</li>
+                <li>VS Code with GitHub Copilot</li>
+                <li>自己做的 agent app</li>
+            </ul>
+
+            <p>Host 負責管理整個使用者體驗:接收使用者輸入、管理對話、呼叫 LLM、判斷是否需要外部能力、顯示最後答案、處理使用者確認與權限體驗。</p>
+
+            <p>如果使用者說「幫我查 deployment 狀態」,通常是 Host 和 LLM 先理解這句話,然後決定可能需要呼叫某個 MCP tool。</p>
+
+            <h3>4.2 Client:Host 裡面負責講 MCP 的元件</h3>
+
+            <p>Client 通常不是使用者直接看到的東西。它在 Host 裡面,負責和某個 MCP server 通訊。一個 Host 可以同時連多個 MCP servers。</p>
+
+            <div class="mermaid">
+graph LR
+    H[Host] --> CA[MCP Client A]
+    H --> CB[MCP Client B]
+    H --> CC[MCP Client C]
+    CA --> SA[GitHub MCP Server]
+    CB --> SB[Filesystem MCP Server]
+    CC --> SC[Company CRM MCP Server]
+            </div>
+            <p class="figure-caption">圖 4-2:一個 Host 可以同時連多個 MCP servers</p>
+
+            <p>你可以把 MCP client 想成 Host 裡面的一個通訊代理。它負責:</p>
+
+            <ul>
+                <li>連線到 server</li>
+                <li>詢問 server 有哪些能力</li>
+                <li>把 tool call 送給 server</li>
+                <li>把 server 回傳結果交回 Host</li>
+            </ul>
+
+            <h3>4.3 Server:Python 工程師最常開發的那一層</h3>
+
+            <p>Server 是暴露能力的外部服務。如果你用 FastMCP 寫:</p>
+
+<pre><code class="language-python">@mcp.tool
+def get_deployment_status(service: str) -> dict:
+    ...</code></pre>
+
+            <p>你正在寫的是 MCP server 的一部分。MCP server 負責:</p>
+
+            <ul>
+                <li>描述自己有哪些 tools/resources/prompts</li>
+                <li>接收 client 的呼叫</li>
+                <li>驗證參數</li>
+                <li>執行 Python code</li>
+                <li>呼叫資料庫、API、檔案或內部服務</li>
+                <li>回傳結果</li>
+            </ul>
+
+            <div class="callout note">
+                <div class="callout-title">重點</div>
+                <p>MCP server 通常不負責推理,也不負責和使用者聊天。它負責提供能力。推理主要發生在 Host 和 LLM 那邊。</p>
+            </div>
+
+            <h3>4.4 小測驗:你到底在寫哪一層?</h3>
+
+            <p>下面幾個東西分別是 Host、Client,還是 Server?</p>
+
+            <ul>
+                <li>Claude Desktop</li>
+                <li>Claude Desktop 裡負責連某個 MCP server 的元件</li>
+                <li>你用 FastMCP 寫的 order server</li>
+                <li>Cursor</li>
+                <li>你寫的 get_order_status Python function</li>
+            </ul>
+
+            <p><strong>參考答案:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>項目</th><th>角色</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Claude Desktop</td><td>Host</td></tr>
+                    <tr><td>Claude Desktop 裡負責連某個 MCP server 的元件</td><td>Client</td></tr>
+                    <tr><td>你用 FastMCP 寫的 order server</td><td>Server</td></tr>
+                    <tr><td>Cursor</td><td>Host</td></tr>
+                    <tr><td>get_order_status Python function</td><td>Server 暴露出來的一個 tool</td></tr>
+                </tbody>
+            </table>
+
+            <h3>4.5 先記住這張圖</h3>
+
+            <p>後面只要你開始混淆,就回到這張圖:</p>
+
+            <div class="mermaid">
+graph TD
+    U[User] --> HL[Host / LLM]
+    HL --> MC[MCP Client]
+    MC --> MS[MCP Server]
+    MS --> PY[Python function / API / Database / File / Workflow]
+            </div>
+            <p class="figure-caption">圖 4-3:MCP 五層架構</p>
+
+            <p>FastMCP 幫你做的是中間偏下這段:</p>
+
+            <pre class="ascii">MCP Server
+  |
+  v
+Python function / API / Database / File / Workflow</pre>
+
+            <p>這個分工清楚之後,後面講 Tools、Resources、Prompts 就容易多了。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 5 ========== -->
+        <section id="ch5">
+            <span class="chapter-num">Chapter 5</span>
+            <h2>Server 到底可以拿出什麼?</h2>
+
+            <p>現在你知道自己多半是在寫 MCP server。下一個問題是:</p>
+
+            <blockquote>
+                <p>Server 可以提供哪些東西給 AI client?</p>
+            </blockquote>
+
+            <p>不要先背名詞。回到客服場景。使用者問:</p>
+
+            <blockquote>
+                <p>這位客戶說他的包裹還沒到。請幫我查訂單狀態,確認退款政策,然後草擬一封回覆。</p>
+            </blockquote>
+
+            <p>這句話其實包含三種不同需求:</p>
+
+            <table>
+                <thead>
+                    <tr><th>需求</th><th>對應 MCP 能力</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>查訂單狀態</td><td>需要執行查詢 → Tool</td></tr>
+                    <tr><td>確認退款政策</td><td>需要讀一份資料 → Resource</td></tr>
+                    <tr><td>草擬客服回覆</td><td>需要一個任務模板 → Prompt</td></tr>
+                </tbody>
+            </table>
+
+            <p>這三種需求,剛好對應 MCP server 最常暴露的三種能力。</p>
+
+            <div class="callout tip">
+                <div class="callout-title">一句話記住</div>
+                <p>Tool 是動作,Resource 是資料,Prompt 是任務起手式。</p>
+            </div>
+
+            <h3>5.1 Tool:需要「做事」時使用</h3>
+
+            <p>如果 AI client 需要執行某個動作,通常就是 Tool。例如:查訂單狀態、建立 ticket、呼叫內部 API、查 deployment status、讀 log 並整理成結構化結果、觸發既有 Python workflow。</p>
+
+            <p>在 FastMCP 裡,tool 通常就是一個 Python function:</p>
+
+<pre><code class="language-python">from fastmcp import FastMCP
+
+mcp = FastMCP("Support Server")
+
+@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment and fulfillment status for one order."""
+    return {
+        "order_id": order_id,
+        "status": "shipped",
+        "tracking_number": "TW123456789",
+    }</code></pre>
+
+            <p>注意這個 tool 的幾個細節:</p>
+
+            <ul>
+                <li>名字是 <code>get_order_status</code>,不是 <code>do_stuff</code></li>
+                <li>參數是 <code>order_id</code>,不是一大包 input</li>
+                <li>回傳是 <code>dict</code>,不是一段難解析文字</li>
+                <li>docstring 說明它查的是 shipment and fulfillment status</li>
+            </ul>
+
+            <p>Tool 的關鍵不是「它能不能被呼叫」。而是:</p>
+
+            <div class="callout note">
+                <div class="callout-title">Tool 設計要點</div>
+                <p>AI client 能不能判斷什麼時候該呼叫它,以及怎麼安全地呼叫它。</p>
+            </div>
+
+            <h3>5.2 Resource:需要「讀資料」時使用</h3>
+
+            <p>如果 AI client 只是需要讀一份資料,通常不要急著做成 tool。例如退款政策:</p>
+
+<pre><code class="language-python">@mcp.resource("policy://refund")
+def refund_policy() -> str:
+    return "Customers can request a refund within 30 days."</code></pre>
+
+            <p>Resource 適合:公司政策、產品文件、專案設定、read-only 報表、runbook、某個使用者或物件的 read-only profile。</p>
+
+            <p>Resource 的重點是:</p>
+
+            <ul>
+                <li>它是資料</li>
+                <li>它可以被命名</li>
+                <li>它通常應該是 read-only</li>
+                <li>它不應該偷偷改變系統狀態</li>
+            </ul>
+
+            <p>你可以把 Resource 想成 AI client 可以打開來看的資料頁。</p>
+
+            <p>如果只是要讀退款政策,使用 Resource 比使用 <code>get_refund_policy()</code> tool 更能表達意圖。</p>
+
+            <h3>5.3 Prompt:需要「任務模板」時使用</h3>
+
+            <p>Prompt 不是拿來查資料,也不是拿來改系統。Prompt 是可重用的任務模板。例如客服回覆草稿:</p>
+
+<pre><code class="language-python">@mcp.prompt
+def draft_customer_reply(topic: str) -> str:
+    return f"Draft a polite customer support reply about: {topic}"</code></pre>
+
+            <p>Prompt 適合:客服回覆草稿、incident summary 模板、code review checklist、報告生成開頭、固定格式的分析任務。</p>
+
+            <p>Prompt 的價值是讓某些工作有一致的起手式。例如同樣是客服回覆,你可能希望每次都遵守:</p>
+
+            <ul>
+                <li>語氣禮貌</li>
+                <li>先承認問題</li>
+                <li>再說目前狀態</li>
+                <li>最後提供下一步</li>
+                <li>不要承諾系統沒有確認過的事</li>
+            </ul>
+
+            <p>這些規則放在 prompt 裡,比每次叫使用者自己描述更穩定。</p>
+
+            <h3>5.4 同一個需求,三種能力可以一起用</h3>
+
+            <p>剛剛那句客服需求可以拆成:</p>
+
+            <table>
+                <thead>
+                    <tr><th>能力</th><th>類型</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>get_order_status(order_id)</code></td><td>Tool</td></tr>
+                    <tr><td><code>policy://refund</code></td><td>Resource</td></tr>
+                    <tr><td><code>draft_customer_reply(topic)</code></td><td>Prompt</td></tr>
+                </tbody>
+            </table>
+
+            <p>注意這不是三選一。一個好的 MCP server 可以同時提供 tools、resources、prompts。重點是每個能力放在正確的位置。</p>
+
+            <h3>5.5 小測驗:這應該是哪一種?</h3>
+
+            <p>請先自己判斷:</p>
+
+            <ol>
+                <li>查某個 customer_id 的訂閱方案</li>
+                <li>讀公司請假政策</li>
+                <li>產生 incident handoff 摘要</li>
+                <li>建立 GitHub issue</li>
+                <li>讀 payment-service 的 runbook</li>
+            </ol>
+
+            <p><strong>參考答案:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>題目</th><th>類型</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>Tool</td></tr>
+                    <tr><td>2</td><td>Resource</td></tr>
+                    <tr><td>3</td><td>Prompt</td></tr>
+                    <tr><td>4</td><td>Tool</td></tr>
+                    <tr><td>5</td><td>Resource</td></tr>
+                </tbody>
+            </table>
+
+            <p>如果你對第 3 題猶豫,這很正常。如果 incident handoff 只是「產生一個固定格式的寫作模板」,它是 Prompt。如果它還要查 log、查 deployment、查 alert,再組合結果,那可能會變成 Tool + Prompt 的組合。</p>
+
+            <h3>5.6 Sampling:先知道有這回事</h3>
+
+            <p>有些 MCP 介紹也會提到 sampling。簡化來說,sampling 讓 server 在某些情境下請 client/host 的 LLM 幫忙生成或判斷內容。</p>
+
+            <div class="callout tip">
+                <div class="callout-title">本堂課範圍</div>
+                <p>Tools、Resources、Prompts 是第一階段最重要的三個概念。Sampling 屬於進階互動能力,第一堂課不用深入。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 6 ========== -->
+        <section id="ch6">
+            <span class="chapter-num">Chapter 6</span>
+            <h2>一次 MCP 呼叫怎麼發生?</h2>
+
+            <p>現在把前面幾章接起來。你已經有:Host、MCP Client、MCP Server、Tool / Resource / Prompt。</p>
+
+            <p>那一次真正的呼叫,是怎麼跑完的?先不要看完整 protocol。我們用逐格動畫看。</p>
+
+            <p>使用者在 AI 應用程式裡問:「這張訂單現在到哪裡了?」</p>
+
+            <h3>6.1 第一格:Host 先理解使用者想做什麼</h3>
+
+            <p>使用者看到的是 Host。例如 Claude Desktop、Cursor、ChatGPT 或 VS Code。Host 會把使用者的問題交給 LLM 理解:「使用者不是在閒聊。使用者想查一張訂單的最新狀態。這可能需要外部工具。」</p>
+
+            <p>這時候 LLM 本身還不知道訂單狀態。它需要看看目前可用的 MCP 能力。</p>
+
+            <h3>6.2 第二格:Client 先知道 server 有哪些能力</h3>
+
+            <p>MCP client 會連到 MCP server。這件事可能發生在啟動時,也可能發生在需要使用 server 前。</p>
+
+            <p>它會問 server:「你有哪些 tools?你有哪些 resources?你有哪些 prompts?每個能力怎麼使用?」</p>
+
+            <p>這個過程叫 <strong>discovery</strong>。Server 回傳的不是原始碼,而是能力描述。</p>
+
+            <p>例如 <code>get_order_status</code> 這個 tool 可能被描述成:</p>
+
+            <pre class="ascii">name: get_order_status
+description: Return shipment and fulfillment status for one order.
+arguments:
+  order_id: string
+returns:
+  object</pre>
+
+            <div class="callout warning">
+                <div class="callout-title">為什麼 docstring 重要</div>
+                <p>Tool 名稱、type hints、docstring 不是裝飾。它們會變成 AI client 判斷工具的依據。</p>
+            </div>
+
+            <h3>6.3 第三格:LLM 選擇要不要呼叫 tool</h3>
+
+            <p>現在 Host / LLM 看到了可用能力。它可能判斷:</p>
+
+            <ul>
+                <li>使用者想查訂單狀態。</li>
+                <li>可用 tool 裡有 <code>get_order_status</code>。</li>
+                <li>這個 tool 需要 <code>order_id</code>。</li>
+                <li>使用者問題裡有訂單編號,或需要先追問。</li>
+            </ul>
+
+            <p>如果資訊足夠,它會準備呼叫 tool。如果資訊不足,它可能先問使用者:「請提供訂單編號。」</p>
+
+            <div class="callout note">
+                <div class="callout-title">重要</div>
+                <p>MCP server 不需要自己猜使用者意思。它接收明確的 tool call 和 arguments。</p>
+            </div>
+
+            <h3>6.4 第四格:Client 發出 tool call</h3>
+
+            <p>當 Host 決定要呼叫 tool,MCP client 會送出類似這樣的請求:</p>
+
+            <pre class="ascii">tools/call
+  name: get_order_status
+  arguments:
+    order_id: A10086</pre>
+
+            <p>如果用更簡化的圖表示:</p>
+
+            <div class="mermaid">
+sequenceDiagram
+    participant C as MCP Client
+    participant S as MCP Server
+    C->>S: call get_order_status(order_id="A10086")
+    S-->>C: result {status: "shipped", ...}
+            </div>
+
+            <h3>6.5 第五格:Server 驗證參數,執行 Python code</h3>
+
+            <p>MCP server 收到呼叫後,會做幾件事:確認 tool 存在、驗證 arguments、執行對應的 Python function、呼叫資料庫/API/內部服務、整理回傳結果。</p>
+
+<pre><code class="language-python">@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment and fulfillment status for one order."""
+    return order_service.lookup(order_id)</code></pre>
+
+            <p>這裡真正查訂單的是你的 Python code。FastMCP 幫你處理 MCP server 的外層。</p>
+
+            <h3>6.6 第六格:結果回到 Host,再由 LLM 組織回答</h3>
+
+            <p>Server 回傳結果:</p>
+
+<pre><code class="language-json">{
+  "order_id": "A10086",
+  "status": "shipped",
+  "tracking_number": "TW123456789"
+}</code></pre>
+
+            <p>MCP client 把結果交回 Host。Host / LLM 再把結構化結果轉成使用者看得懂的回答:</p>
+
+            <blockquote>
+                <p>這張訂單已經出貨,物流追蹤號碼是 TW123456789。</p>
+            </blockquote>
+
+            <p>注意最後一句通常不是 MCP server 產生的。MCP server 回傳的是資料。Host / LLM 負責把資料放回對話脈絡。</p>
+
+            <h3>6.7 整個流程放在一起</h3>
+
+            <div class="mermaid">
+sequenceDiagram
+    participant U as User
+    participant H as Host / LLM
+    participant C as MCP Client
+    participant S as MCP Server
+    participant DB as Database / API
+
+    U->>H: 這張訂單到哪了?
+    H->>C: 需要使用工具
+    C->>S: discover capabilities
+    S-->>C: tools list
+    H->>C: call get_order_status(A10086)
+    C->>S: tools/call
+    S->>DB: lookup(A10086)
+    DB-->>S: order data
+    S-->>C: result
+    C-->>H: result
+    H-->>U: 訂單已出貨,追蹤號 TW123456789
+            </div>
+            <p class="figure-caption">圖 6-1:一次完整的 MCP 呼叫流程</p>
+
+            <p>更協議一點的流程可以簡化成:</p>
+
+            <pre class="ascii">initialize
+  -> discovery
+  -> invocation
+  -> result
+  -> termination</pre>
+
+            <h3>6.8 關鍵字:Discovery</h3>
+
+            <p>Discovery 很重要。MCP client 不只是「知道某個 URL 可以打」。它可以向 server 詢問:你有哪些工具?每個工具叫什麼名字?用途是什麼?需要哪些參數?參數型別是什麼?回傳什麼?</p>
+
+            <p>LLM 不是讀你的原始碼來猜 tool 怎麼用。它主要靠 server 暴露出來的 metadata 和 schema 做選擇。</p>
+
+            <p>所以當你寫:</p>
+
+<pre><code class="language-python">@mcp.tool
+def do_stuff(input: str) -> str:
+    """Do stuff."""
+    ...</code></pre>
+
+            <div class="callout warning">
+                <div class="callout-title">壞 tool 的代價</div>
+                <p>你不是只寫了一個醜 API。你是在給 AI client 一張很難判斷的工具卡。</p>
+            </div>
+
+            <h3>6.9 知道即可:MCP 訊息大概長什麼樣子</h3>
+
+            <p>第一堂課不需要深講 JSON-RPC,但可以讓學生知道 MCP 通訊不是魔法。MCP 的底層通訊會有幾類訊息:</p>
+
+            <table>
+                <thead>
+                    <tr><th>訊息類型</th><th>用途</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Request</td><td>client 要求 server 做某件事</td></tr>
+                    <tr><td>Response</td><td>server 回覆成功結果</td></tr>
+                    <tr><td>Error</td><td>server 回覆錯誤</td></tr>
+                    <tr><td>Notification</td><td>單向通知,例如進度更新</td></tr>
+                </tbody>
+            </table>
+
+            <p>例如呼叫 tool 時,可以先用這個簡化圖理解:</p>
+
+            <pre class="ascii">Client -> Server: tools/call(name="get_order_status", arguments={...})
+Server -> Client: result={...}</pre>
+
+            <p>你現在不需要手寫這些訊息。FastMCP 會幫你處理協議細節。你需要先理解的是:</p>
+
+            <blockquote>
+                <p>MCP client 能發現 server 有哪些能力,然後用標準訊息呼叫其中一個能力。</p>
+            </blockquote>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 7 ========== -->
+        <section id="ch7">
+            <span class="chapter-num">Chapter 7</span>
+            <h2>三個很像但不同層的東西</h2>
+
+            <p>到這裡,很多人腦中會出現三張卡:REST API、Function calling、MCP。它們看起來都和「呼叫外部功能」有關。所以很容易混在一起。</p>
+
+            <p>先用一句話拆開:</p>
+
+            <table>
+                <thead>
+                    <tr><th>名詞</th><th>定位</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>REST API</td><td>系統提供給程式呼叫的介面</td></tr>
+                    <tr><td>Function calling</td><td>模型表示「我要呼叫工具」的一種方式</td></tr>
+                    <tr><td>MCP</td><td>AI client 連接、發現、呼叫外部能力的協議</td></tr>
+                </tbody>
+            </table>
+
+            <h3>7.1 REST API:系統原本就有的入口</h3>
+
+            <p>你的訂單系統可能本來就有 API:</p>
+
+            <pre class="ascii">GET /orders/{id}
+POST /tickets
+GET /customers/{id}/subscriptions</pre>
+
+            <p>這些 API 對一般程式很有用。程式知道:我要打哪個 endpoint、用哪個 method、帶什麼 body、怎麼解析 response。</p>
+
+            <p>但是 AI client 還需要另一層語意。它不只想知道 endpoint。它想知道:這個能力叫什麼?什麼時候該用?需要哪些參數?參數對使用者任務的意義是什麼?回傳結果能不能放進對話?操作有沒有 side effect?需不需要權限、確認或審計?</p>
+
+            <p>所以 MCP 不是 REST API 的替代品。很多時候,你的 MCP server 內部仍然會呼叫 REST API。差別是對外暴露的層次不同:</p>
+
+            <div class="callout note">
+                <div class="callout-title">兩層差異</div>
+                <p>REST API exposes endpoints. MCP exposes capabilities.</p>
+            </div>
+
+            <p>例如,內部可以還是 <code>GET /orders/{id}</code>,但對 AI client 暴露成:</p>
+
+<pre><code class="language-python">@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment and fulfillment status for one order."""
+    ...</code></pre>
+
+            <h3>7.2 Function calling:模型說「我想用工具」</h3>
+
+            <p>Function calling 通常是模型平台提供的一種能力。它讓模型可以用結構化方式表示:「我想呼叫這個函式。我要傳這些參數。」</p>
+
+            <p>例如模型可能產生類似:</p>
+
+            <pre class="ascii">call get_order_status with order_id="A10086"</pre>
+
+            <p>這回答的是「模型如何表達工具呼叫」。但它沒有完整回答:工具從哪裡來?client 怎麼發現工具?工具 schema 怎麼暴露?工具跑在哪裡?不同 AI host 怎麼連同一個工具 server?resources 和 prompts 怎麼處理?</p>
+
+            <p>這些是 MCP 所在的層次。</p>
+
+            <h3>7.3 MCP:把工具和資料接到 AI client 的標準方式</h3>
+
+            <p>MCP 關心的是 AI client 和外部世界之間的連接。它定義:client 怎麼連 server、client 怎麼 discovery、server 怎麼描述 tools/resources/prompts、client 怎麼呼叫 tool、server 怎麼回傳結果。</p>
+
+            <p>所以實務上三者可以同時存在:</p>
+
+            <div class="mermaid">
+graph TD
+    A[Host / LLM] -->|function calling style decision| B[MCP Client]
+    B -->|MCP protocol| C[FastMCP Server]
+    C -->|Python code| D[Internal REST API / Database / Service]
+            </div>
+            <p class="figure-caption">圖 7-1:三層共存的實務架構</p>
+
+            <p>請注意這張圖的方向。MCP server 不一定取代你的 REST API。它常常是把既有 REST API、資料庫、Python workflow,整理成 AI client 比較容易使用的能力層。</p>
+
+            <h3>7.4 小測驗:下面在講哪一層?</h3>
+
+            <ol>
+                <li><code>GET /orders/{id}</code></li>
+                <li><code>get_order_status(order_id)</code></li>
+                <li>模型決定要呼叫 <code>get_order_status</code>,並產生參數</li>
+                <li>Client 向 server 詢問有哪些 tools</li>
+            </ol>
+
+            <p><strong>參考答案:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>題目</th><th>層次</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>REST API</td></tr>
+                    <tr><td>2</td><td>MCP tool capability</td></tr>
+                    <tr><td>3</td><td>Function calling / tool selection</td></tr>
+                    <tr><td>4</td><td>MCP discovery</td></tr>
+                </tbody>
+            </table>
+
+            <div class="callout tip">
+                <div class="callout-title">本章記住</div>
+                <p>REST API、function calling、MCP 不是互相取代,而是站在不同層次處理不同問題。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 8 ========== -->
+        <section id="ch8">
+            <span class="chapter-num">Chapter 8</span>
+            <h2>Server 住在哪裡?stdio 與 HTTP</h2>
+
+            <p>到目前為止,我們一直說:「MCP Client 連到 MCP Server」。但 server 到底住在哪裡?</p>
+
+            <p>有兩種常見情況。一種是 server 就在使用者自己的電腦裡。另一種是 server 跑在遠端,讓很多人或很多 agent 連過去。這就會牽涉到 <strong>transport</strong>。</p>
+
+            <p>Transport 不改變 tool 的設計。它只回答一個問題:</p>
+
+            <blockquote>
+                <p>Client 和 server 要怎麼通訊?</p>
+            </blockquote>
+
+            <h3>8.1 Local / stdio:server 跟 Host 在同一台機器</h3>
+
+            <p>stdio 常見於本機工具。你可以想成:Host 啟動一個 MCP server subprocess,Host 透過 stdin/stdout 和 server 傳訊息。</p>
+
+            <div class="mermaid">
+graph TD
+    subgraph "User's laptop"
+        H[Host] -->|stdin/stdout| S[Local MCP Server]
+        S --> F[Local files / local project / local scripts]
+    end
+            </div>
+            <p class="figure-caption">圖 8-1:stdio transport — server 跑在本機</p>
+
+            <p>stdio 適合:本機檔案操作、IDE 工具、開發階段、個人使用的 automation、不需要開 port 的 local server。</p>
+
+            <p>例如,IDE 想讓 AI 讀你本機專案檔案,stdio 就很自然。</p>
+
+            <h3>8.2 Remote / HTTP:server 跑在網路另一端</h3>
+
+            <p>HTTP 適合遠端服務。Host / MCP Client 透過網路連到 MCP Server。</p>
+
+            <div class="mermaid">
+graph TD
+    U[User / Agent] --> H[Host]
+    H -->|HTTP| S[Remote MCP Server]
+    S --> A[Company API / Database / Workflow]
+            </div>
+            <p class="figure-caption">圖 8-2:HTTP transport — server 跑在遠端</p>
+
+            <p>HTTP 適合:團隊共享服務、cloud agent、production deployment、集中治理、監控與 logging、權限控管。</p>
+
+            <p>但遠端也代表你不能只想「跑起來」。你還要想:authentication、authorization、TLS、rate limit、timeout、logging、audit、deployment、versioning。</p>
+
+            <h3>8.3 小測驗:你會選哪一種?</h3>
+
+            <ol>
+                <li>讓 Cursor 讀目前專案裡的檔案</li>
+                <li>讓全公司客服 AI 查訂單狀態</li>
+                <li>開發階段先測一個 demo server</li>
+                <li>讓 cloud agent 查公司內部 deployment 狀態</li>
+            </ol>
+
+            <p><strong>參考答案:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>題目</th><th>適合</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>Local / stdio</td></tr>
+                    <tr><td>2</td><td>Remote / HTTP</td></tr>
+                    <tr><td>3</td><td>Local / stdio 或 HTTP 都可以,看你要測什麼</td></tr>
+                    <tr><td>4</td><td>Remote / HTTP</td></tr>
+                </tbody>
+            </table>
+
+            <h3>8.4 對 FastMCP 的意義</h3>
+
+            <p>後面寫 FastMCP 時,你會看到:</p>
+
+<pre><code class="language-python">if __name__ == "__main__":
+    mcp.run()</code></pre>
+
+            <p>也會看到 CLI:</p>
+
+<pre><code class="language-bash">fastmcp run server.py:mcp
+fastmcp run server.py:mcp --transport http --port 8000</code></pre>
+
+            <p>不要把 transport 想成另一種 tool。同一個 tool:</p>
+
+<pre><code class="language-python">@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    ...</code></pre>
+
+            <p>可以透過不同 transport 被 client 使用。</p>
+
+            <div class="callout note">
+                <div class="callout-title">記住</div>
+                <p>Transport 改變的是連線方式,不是能力本身。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 9 ========== -->
+        <section id="ch9">
+            <span class="chapter-num">Chapter 9</span>
+            <h2>FastMCP:你終於要寫的那段 Python</h2>
+
+            <p>前面講了很多架構。現在回到 Python 工程師最在意的問題:</p>
+
+            <blockquote>
+                <p>所以我到底要寫什麼?</p>
+            </blockquote>
+
+            <p>答案通常是:你寫 Python function,FastMCP 把它變成 MCP server capability。</p>
+
+            <p>MCP 是標準。FastMCP 是 Python 開發 MCP server 的高階框架。</p>
+
+            <h3>9.1 最小可跑範例</h3>
+
+            <p>如果你會寫 Python function,就可以很快寫出第一個 MCP server:</p>
+
+<pre><code class="language-python">from fastmcp import FastMCP
+
+mcp = FastMCP("Demo Server")
+
+@mcp.tool
+def add(a: int, b: int) -> int:
+    """Add two numbers."""
+    return a + b
+
+if __name__ == "__main__":
+    mcp.run()</code></pre>
+
+            <p>先不要小看這幾行。它裡面其實有一整套轉換:</p>
+
+            <table>
+                <thead>
+                    <tr><th>Python 元素</th><th>MCP 概念</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Python function</td><td>MCP tool</td></tr>
+                    <tr><td>type hints</td><td>input schema</td></tr>
+                    <tr><td>docstring</td><td>tool description</td></tr>
+                    <tr><td>return value</td><td>MCP response</td></tr>
+                    <tr><td><code>mcp.run()</code></td><td>server runtime</td></tr>
+                </tbody>
+            </table>
+
+            <h3>9.2 這幾行分別在做什麼?</h3>
+
+            <p><code>mcp = FastMCP("Demo Server")</code> — 這行建立一個 MCP server。</p>
+
+            <p><code>@mcp.tool</code> 把 <code>add</code> 註冊成一個 tool。FastMCP 會看 function name、parameters、type hints、docstring、return type,然後把它整理成 MCP client 可以 discovery 的能力描述。</p>
+
+            <p><code>mcp.run()</code> 啟動 server。</p>
+
+            <h3>9.3 FastMCP 幫你省掉什麼?</h3>
+
+            <p>如果不用框架,你需要自己處理很多協議細節。FastMCP 幫你處理:tool registration、schema generation、request parsing、argument validation、response formatting、transport runtime、client interaction。</p>
+
+            <p>所以你可以把注意力放在更重要的問題:</p>
+
+            <ul>
+                <li>我要暴露什麼能力?</li>
+                <li>這個能力應該是 tool、resource,還是 prompt?</li>
+                <li>參數是否清楚?</li>
+                <li>回傳是否結構化?</li>
+                <li>是否有 side effect?</li>
+                <li>是否需要權限、確認或審計?</li>
+                <li>LLM 能不能根據名稱和描述正確使用它?</li>
+            </ul>
+
+            <h3>9.4 小心:短程式不代表簡單設計</h3>
+
+            <p>FastMCP 的語法會讓第一個 demo 很快跑起來。這是好事。但它也容易讓人誤會:「只要加 decorator,就完成 MCP server 設計了。」</p>
+
+            <p>不對。Decorator 只是把 Python function 暴露出去。真正的工程判斷在於你暴露了什麼、怎麼命名、怎麼限制、怎麼測試,以及誰可以使用。</p>
+
+            <div class="callout warning">
+                <div class="callout-title">下一章預告</div>
+                <p>不要從 API 清單開始設計 MCP server。要從任務開始。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 10 ========== -->
+        <section id="ch10">
+            <span class="chapter-num">Chapter 10</span>
+            <h2>設計 MCP 能力:不要從 API 開始,從任務開始</h2>
+
+            <p>很多工程師會想:「我們公司有 200 個 REST API endpoint,我是不是全部包成 MCP tools?」</p>
+
+            <p>通常不要。</p>
+
+            <p>MCP server 應該從 AI client 要完成的任務開始設計,而不是從現有 endpoint 清單開始。</p>
+
+            <h3>10.1 壞設計</h3>
+
+<pre><code class="language-python">@mcp.tool
+def call_api(method: str, path: str, body: dict) -> dict:
+    """Call an internal API."""
+    ...</code></pre>
+
+            <p>這對 LLM 來說太模糊,也太危險。它不知道哪些 path 可以用,不知道 body 格式,不知道操作風險,也可能誤打高風險 API。</p>
+
+            <h3>10.2 好一點的設計</h3>
+
+<pre><code class="language-python">@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment and fulfillment status for one order."""
+    ...
+
+@mcp.tool
+def create_support_ticket(
+    customer_id: str,
+    title: str,
+    description: str,
+    priority: str = "normal",
+) -> dict:
+    """Create a support ticket for a customer issue."""
+    ...</code></pre>
+
+            <p>這些 tool 有清楚的業務語意。LLM 比較容易知道:什麼時候該用、要傳什麼參數、會產生什麼結果、是否可能有副作用。</p>
+
+            <h3>10.3 Tool 設計準則</h3>
+
+            <p>好的 tool 通常有這些特徵:</p>
+
+            <ul>
+                <li>名稱清楚,通常是動詞開頭:<code>search_orders</code>、<code>create_ticket</code></li>
+                <li>參數少而明確</li>
+                <li>type hints 完整</li>
+                <li>docstring 寫給 LLM 看,不只是寫給人看</li>
+                <li>回傳結構化資料,而不是一大段難解析文字</li>
+                <li>高風險操作有權限、確認、審計</li>
+                <li>不要用萬用參數如 <code>input: str</code> 承載所有東西</li>
+                <li>不要用 <code>*args</code> 或 <code>**kwargs</code> 當 tool 參數</li>
+            </ul>
+
+            <h3>10.4 好工具像一個清楚的按鈕</h3>
+
+            <p>想像每個 tool 都是 AI client 介面上的一顆隱形按鈕。</p>
+
+            <p>如果按鈕叫 <code>do_stuff</code>,沒人知道它會做什麼。</p>
+
+            <p>如果按鈕叫 <code>refund_customer_payment</code>,大家至少知道這是高風險動作,需要權限和確認。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 11 ========== -->
+        <section id="ch11">
+            <span class="chapter-num">Chapter 11</span>
+            <h2>安全:MCP 不會自動替你做權限設計</h2>
+
+            <p>MCP 標準化的是連接方式,不是替你的公司完成安全設計。這一點要在第一堂課就講。</p>
+
+            <p>MCP server 可能連到:</p>
+
+            <ul>
+                <li>客戶資料</li>
+                <li>內部文件</li>
+                <li>production 系統</li>
+                <li>ticket 系統</li>
+                <li>email</li>
+                <li>付款或退款流程</li>
+                <li>deployment pipeline</li>
+            </ul>
+
+            <p>這些都不是玩具。</p>
+
+            <h3>11.1 高風險 tool</h3>
+
+            <p>以下 tool 需要特別小心:</p>
+
+            <ul>
+                <li>刪除資料</li>
+                <li>寄送 email</li>
+                <li>建立付款或退款</li>
+                <li>修改權限</li>
+                <li>執行 deployment</li>
+                <li>執行任意 SQL</li>
+                <li>操作 production</li>
+                <li>存取敏感個資</li>
+            </ul>
+
+            <h3>11.2 基本安全原則</h3>
+
+            <p>至少要有這些觀念:</p>
+
+            <ul>
+                <li><strong>最小權限</strong>:tool 只拿它需要的權限</li>
+                <li><strong>明確授權</strong>:不要因為 AI client 會呼叫就信任它</li>
+                <li><strong>輸入驗證</strong>:LLM 產生的 arguments 仍然是外部輸入</li>
+                <li><strong>審計紀錄</strong>:誰在什麼時間透過哪個 tool 做了什麼</li>
+                <li><strong>高風險操作確認</strong>:刪除、付款、寄信、部署不要自動亂跑</li>
+                <li><strong>資料最小化</strong>:不要把不必要的敏感資料回傳給 LLM</li>
+                <li><strong>防 prompt injection</strong>:外部資料可能包含惡意指令</li>
+                <li><strong>tool 數量控制</strong>:暴露太多 tool 會降低選擇準確度,也增加風險</li>
+            </ul>
+
+            <h3>11.3 重要提醒</h3>
+
+            <div class="callout warning">
+                <div class="callout-title">新的攻擊面</div>
+                <p>MCP server 是一個新的能力邊界,也是一個新的攻擊面。</p>
+            </div>
+
+            <p>所以不要只問:「這個 tool 能不能做?」</p>
+
+            <p>還要問:</p>
+
+            <ul>
+                <li>誰可以用?</li>
+                <li>什麼情境可以用?</li>
+                <li>輸入可信嗎?</li>
+                <li>結果會不會外洩資料?</li>
+                <li>操作有沒有紀錄?</li>
+                <li>失敗時會怎麼樣?</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 12 ========== -->
+        <section id="ch12">
+            <span class="chapter-num">Chapter 12</span>
+            <h2>什麼適合做 MCP server?</h2>
+
+            <div class="callout tip">
+                <div class="callout-title">適合的場景</div>
+                <ul>
+                    <li>查詢內部文件</li>
+                    <li>查詢訂單與客戶狀態</li>
+                    <li>查 deployment status</li>
+                    <li>查 log、metrics、incident 狀態</li>
+                    <li>建立 Jira、Linear、GitHub issue</li>
+                    <li>呼叫既有 Python workflow</li>
+                    <li>包裝內部 API 成少量高語意 tools</li>
+                    <li>提供公司政策、產品文件、runbook 給 AI client</li>
+                </ul>
+            </div>
+
+            <div class="callout warning">
+                <div class="callout-title">不適合的場景</div>
+                <ul>
+                    <li>把 200 個 REST endpoints 原封不動暴露</li>
+                    <li>給 LLM 任意 SQL 執行權</li>
+                    <li>沒有權限控管的寫入操作</li>
+                    <li>高風險 production 操作直接自動執行</li>
+                    <li>用一個 <code>do_anything(input: str)</code> 包所有功能</li>
+                    <li>回傳大量未過濾敏感資料</li>
+                </ul>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 13 ========== -->
+        <section id="ch13">
+            <span class="chapter-num">Chapter 13</span>
+            <h2>小練習:判斷 Tool、Resource、Prompt</h2>
+
+            <p>請判斷下面能力應該設計成 Tool、Resource,還是 Prompt:</p>
+
+            <ol>
+                <li>查詢使用者目前訂閱方案</li>
+                <li>讀取公司退款政策</li>
+                <li>幫客服產生一封道歉信</li>
+                <li>建立 Jira ticket</li>
+                <li>查詢最近一次部署狀態</li>
+                <li>讀取某份產品規格文件</li>
+                <li>產生 incident report 草稿</li>
+                <li>取消使用者訂閱</li>
+            </ol>
+
+            <p><strong>參考答案:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>題目</th><th>類型</th><th>備註</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>1</td><td>Tool</td><td></td></tr>
+                    <tr><td>2</td><td>Resource</td><td></td></tr>
+                    <tr><td>3</td><td>Prompt</td><td></td></tr>
+                    <tr><td>4</td><td>Tool</td><td></td></tr>
+                    <tr><td>5</td><td>Tool 或 Resource</td><td>取決於是否需要即時計算或查外部系統</td></tr>
+                    <tr><td>6</td><td>Resource</td><td></td></tr>
+                    <tr><td>7</td><td>Prompt,或 Tool + Prompt</td><td>取決於是否需要查資料</td></tr>
+                    <tr><td>8</td><td>Tool</td><td>而且是高風險 side-effect tool</td></tr>
+                </tbody>
+            </table>
+
+            <h3>討論重點</h3>
+
+            <p>第 5 題為什麼可以是 Tool 或 Resource?</p>
+
+            <p>如果 deployment status 是一份已經產生好的 read-only 狀態頁,那它可以是 Resource。如果需要即時呼叫 CI/CD API、聚合多個系統狀態、計算結果,那它比較像 Tool。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 14 ========== -->
+        <section id="ch14">
+            <span class="chapter-num">Chapter 14</span>
+            <h2>小練習:修正壞 tool</h2>
+
+            <p>下面這個 tool 有什麼問題?</p>
+
+<pre><code class="language-python">@mcp.tool
+def do_stuff(input: str) -> str:
+    """Do stuff."""
+    ...</code></pre>
+
+            <p><strong>問題:</strong></p>
+
+            <ul>
+                <li>名稱沒有語意</li>
+                <li>參數太模糊</li>
+                <li>docstring 沒有幫助</li>
+                <li>回傳格式不清楚</li>
+                <li>不知道是否有副作用</li>
+                <li>LLM 很難知道什麼時候該呼叫</li>
+            </ul>
+
+            <p>可以改成:</p>
+
+<pre><code class="language-python">@mcp.tool
+def search_customer_orders(customer_email: str, limit: int = 10) -> list[dict]:
+    """Search recent orders for a customer by email address."""
+    ...</code></pre>
+
+            <p>或:</p>
+
+<pre><code class="language-python">@mcp.tool
+def create_customer_support_ticket(
+    customer_email: str,
+    subject: str,
+    summary: str,
+    priority: str = "normal",
+) -> dict:
+    """Create a customer support ticket and return the ticket ID."""
+    ...</code></pre>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 15 ========== -->
+        <section id="ch15">
+            <span class="chapter-num">Chapter 15</span>
+            <h2>第一堂課建議安排:60 到 90 分鐘</h2>
+
+            <p>如果只有一堂 MCP 介紹課,我建議這樣排:</p>
+
+            <table>
+                <thead>
+                    <tr><th>時間</th><th>主題</th><th>目的</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>10 分鐘</td><td>模型隔離問題</td><td>讓學生知道為什麼需要 MCP</td></tr>
+                    <tr><td>10 分鐘</td><td>M × N 整合問題</td><td>讓工程師理解標準化價值</td></tr>
+                    <tr><td>15 分鐘</td><td>Host / Client / Server 架構</td><td>建立共通語言</td></tr>
+                    <tr><td>15 分鐘</td><td>Tools / Resources / Prompts</td><td>建立設計判斷</td></tr>
+                    <tr><td>10 分鐘</td><td>MCP 呼叫流程與 discovery</td><td>理解 schema、docstring 的重要性</td></tr>
+                    <tr><td>10 分鐘</td><td>MCP vs REST API vs function calling</td><td>排除常見誤解</td></tr>
+                    <tr><td>10 分鐘</td><td>安全與適用場景</td><td>避免 demo 心態</td></tr>
+                    <tr><td>10 分鐘</td><td>練習與討論</td><td>讓學生真的會分類與設計</td></tr>
+                </tbody>
+            </table>
+
+            <p>如果只有 60 分鐘,可以壓縮掉 protocol 細節,保留:</p>
+
+            <pre class="ascii">問題 -> 架構 -> 能力分類 -> 呼叫流程 -> 安全 -> 練習</pre>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 16 ========== -->
+        <section id="ch16">
+            <span class="chapter-num">Chapter 16</span>
+            <h2>後續 FastMCP 工作坊:3.5 小時版本</h2>
+
+            <p>第一堂介紹 MCP 後,接下來的 FastMCP 實作課可以這樣排。</p>
+
+            <h3>課前環境</h3>
+
+            <p>建議用 Python 3.11+ 或 3.12,並用虛擬環境管理依賴。</p>
+
+            <p>安裝 FastMCP:</p>
+
+<pre><code class="language-bash">pip install fastmcp</code></pre>
+
+            <p>或使用 uv:</p>
+
+<pre><code class="language-bash">uv add fastmcp</code></pre>
+
+            <p>驗證:</p>
+
+<pre><code class="language-bash">fastmcp version</code></pre>
+
+            <p>Production 專案建議 pin 版本,例如:</p>
+
+<pre><code>fastmcp==3.0.0</code></pre>
+
+            <div class="callout note">
+                <div class="callout-title">為什麼要 pin 版本</div>
+                <p>MCP 生態仍在快速演進,production 不應該用過寬的版本範圍承擔不必要的 breaking change 風險。</p>
+            </div>
+
+            <h3>16.1 第一段:第一個 FastMCP server,45 分鐘</h3>
+
+            <p>目標:每個人都跑起來。</p>
+
+<pre><code class="language-python">from fastmcp import FastMCP
+
+mcp = FastMCP("Demo Server")
+
+@mcp.tool
+def greet(name: str) -> str:
+    """Return a greeting."""
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    mcp.run()</code></pre>
+
+            <p>要講:</p>
+
+            <ul>
+                <li><code>FastMCP(...)</code> 是 server</li>
+                <li><code>@mcp.tool</code> 註冊工具</li>
+                <li>type hints 會變 schema</li>
+                <li>docstring 會變描述</li>
+                <li><code>mcp.run()</code> 啟動 server</li>
+                <li>CLI 可以指定 transport</li>
+            </ul>
+
+            <h3>16.2 第二段:Tools 實戰,45 分鐘</h3>
+
+            <p>讓學生做三種 tool:</p>
+
+            <ul>
+                <li>pure function tool</li>
+                <li>I/O query tool</li>
+                <li>side-effect tool</li>
+            </ul>
+
+            <p>例如:</p>
+
+            <ul>
+                <li><code>calculate_discount(price, rate)</code></li>
+                <li><code>get_order_status(order_id)</code></li>
+                <li><code>create_support_ticket(...)</code></li>
+            </ul>
+
+            <p>重點不是 decorator,而是 tool 設計。</p>
+
+            <h3>16.3 第三段:Resources / Prompts,35 分鐘</h3>
+
+            <p>讓學生知道不是所有能力都該做成 tool。</p>
+
+<pre><code class="language-python">@mcp.resource("config://app")
+def app_config() -> dict:
+    return {"env": "dev", "version": "1.0.0"}
+
+@mcp.prompt
+def summarize_incident(incident_id: str) -> str:
+    return f"Summarize incident {incident_id} for an engineering handoff."</code></pre>
+
+            <h3>16.4 第四段:測試,35 分鐘</h3>
+
+            <p>不要只靠 AI client 手動測。用 FastMCP Client 和 pytest 建立開發迴圈:</p>
+
+<pre><code class="language-python">from fastmcp import Client
+from server import mcp
+
+async def test_add():
+    async with Client(mcp) as client:
+        result = await client.call_tool("add", {"a": 1, "b": 2})
+        assert result</code></pre>
+
+            <p>要測:</p>
+
+            <ul>
+                <li>list tools</li>
+                <li>call tool</li>
+                <li>錯誤輸入</li>
+                <li>回傳格式</li>
+                <li>side-effect 是否受控</li>
+            </ul>
+
+            <h3>16.5 第五段:工程化與 production,30 分鐘</h3>
+
+            <p>至少講:</p>
+
+            <ul>
+                <li>pin <code>fastmcp==x.y.z</code></li>
+                <li>HTTP 部署要有 auth</li>
+                <li>log / metrics / tracing</li>
+                <li>timeout</li>
+                <li>權限控管</li>
+                <li>高風險 tool 的確認流程</li>
+                <li>不要一次暴露太多 tools</li>
+                <li>schema 和 docstring 要 review</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 17 ========== -->
+        <section id="ch17">
+            <span class="chapter-num">Chapter 17</span>
+            <h2>課程總路線</h2>
+
+            <p>如果要做成完整短課,我會安排成四堂:</p>
+
+            <table>
+                <thead>
+                    <tr><th>堂次</th><th>主題</th><th>建立什麼</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>第 1 堂</td><td>MCP 概念與架構</td><td>語言</td></tr>
+                    <tr><td>第 2 堂</td><td>用 FastMCP 寫第一個 server</td><td>手感</td></tr>
+                    <tr><td>第 3 堂</td><td>Tools / Resources / Prompts 實戰</td><td>設計能力</td></tr>
+                    <tr><td>第 4 堂</td><td>測試、部署、安全與 production pattern</td><td>工程品質</td></tr>
+                </tbody>
+            </table>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 18 ========== -->
+        <section id="ch18">
+            <span class="chapter-num">Chapter 18</span>
+            <h2>講師備忘:這堂課最重要的幾句話</h2>
+
+            <p>你可以在課堂中反覆使用這幾句:</p>
+
+            <blockquote>
+                <p>MCP 不是讓模型變聰明,而是讓模型能接觸外部世界。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>MCP server 通常不負責推理,它負責提供能力。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>REST API 暴露 endpoints,MCP 暴露 capabilities。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>不要從 API 清單開始設計 MCP server,要從 AI client 要完成的任務開始。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>Tool 的 docstring 是寫給 LLM 的使用說明。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>用了 MCP 不代表自動安全。權限、審計、確認流程仍然是你的責任。</p>
+            </blockquote>
+
+            <blockquote>
+                <p>FastMCP 的 decorator 很簡單,真正困難的是能力設計。</p>
+            </blockquote>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 19 ========== -->
+        <section id="ch19">
+            <span class="chapter-num">Chapter 19</span>
+            <h2>一頁式總結</h2>
+
+            <p>MCP 是 AI 應用程式連接外部系統的開放標準。</p>
+
+            <p>它解決的是 AI client 和外部 tools/data sources 之間的整合問題。沒有 MCP,每個 client 都要客製連每個系統,形成 M × N 的整合爆炸。有了 MCP,client 和 server 都面向同一個標準,整合成本變成 M + N。</p>
+
+            <p>MCP 架構裡,Host 是使用者面對的 AI app,Client 是 Host 裡負責 MCP 通訊的元件,Server 是暴露能力的外部服務。Python 工程師通常要寫的是 MCP server。</p>
+
+            <p>MCP server 主要暴露 Tools、Resources、Prompts。Tool 用來執行動作,Resource 用來提供 read-only data,Prompt 用來提供可重用的任務模板。</p>
+
+            <p>FastMCP 是 Python 開發 MCP server 的高階框架。它讓你用 Python function、type hints、docstring 和 decorator 快速建立 MCP tools、resources、prompts。</p>
+
+            <div class="callout warning">
+                <div class="callout-title">關鍵提醒</div>
+                <p>FastMCP 只讓開發變簡單,不會自動讓設計變好。好的 MCP server 需要清楚的能力邊界、乾淨的 tool schema、合理的權限、安全的 side-effect 控制,以及可測試的開發流程。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 20 ========== -->
+        <section id="ch20">
+            <span class="chapter-num">Chapter 20</span>
+            <h2>課後作業與評量</h2>
+
+            <h3>作業 A:能力分類</h3>
+
+            <p>請挑一個你熟悉的內部系統,例如客服系統、訂單系統、部署系統或文件系統,列出 10 個 AI 可能需要的能力。</p>
+
+            <p>對每個能力標記:</p>
+
+            <ul>
+                <li>Tool / Resource / Prompt</li>
+                <li>是否有 side effect</li>
+                <li>是否需要權限</li>
+                <li>是否需要審計</li>
+                <li>是否適合第一版就開放</li>
+            </ul>
+
+            <h3>作業 B:設計 5 個 tools</h3>
+
+            <p>請設計 5 個 tools,只需要寫 signature 和 docstring。</p>
+
+            <p>範例:</p>
+
+<pre><code class="language-python">def get_customer_subscription(customer_id: str) -> dict:
+    """Return the current subscription plan and renewal status for one customer."""</code></pre>
+
+            <p><strong>評量標準:</strong></p>
+
+            <ul>
+                <li>tool 名稱是否清楚</li>
+                <li>參數是否具體</li>
+                <li>docstring 是否能幫 LLM 判斷使用時機</li>
+                <li>回傳型別是否明確</li>
+                <li>是否看得出 side effect 風險</li>
+            </ul>
+
+            <h3>作業 C:找出風險</h3>
+
+            <p>請檢查下面 tool 設計,指出風險並提出改法:</p>
+
+<pre><code class="language-python">def run_sql(query: str) -> str:
+    """Run SQL against production database."""</code></pre>
+
+            <p>至少應該討論:</p>
+
+            <ul>
+                <li>任意 SQL 的風險</li>
+                <li>read-only 與 write 權限分離</li>
+                <li>查詢範圍限制</li>
+                <li>結果資料脫敏</li>
+                <li>審計紀錄</li>
+                <li>是否應改成少量明確查詢 tools</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 21 ========== -->
+        <section id="ch21">
+            <span class="chapter-num">Chapter 21</span>
+            <h2>常見誤解</h2>
+
+            <h3>誤解 1:MCP server 就是聊天機器人</h3>
+
+            <p>不是。MCP server 通常不負責和使用者聊天,也不負責產生最終自然語言回答。它更像一個能力供應者:</p>
+
+            <ul>
+                <li>Host / LLM 負責理解問題與組織回答</li>
+                <li>MCP server 負責提供可被呼叫的能力</li>
+            </ul>
+
+            <p>如果學生已經寫過 FastAPI,可以這樣類比:</p>
+
+            <table>
+                <thead>
+                    <tr><th>框架</th><th>對外暴露</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>FastAPI app</td><td>通常提供 HTTP endpoints</td></tr>
+                    <tr><td>FastMCP server</td><td>提供 AI client 可發現、可呼叫的 capabilities</td></tr>
+                </tbody>
+            </table>
+
+            <h3>誤解 2:MCP 會取代 RAG</h3>
+
+            <p>不一定。RAG 通常用來把大量文件切片、索引、檢索,再把相關內容放進 LLM context。MCP 則是讓 AI client 用標準方式連接外部 tools、resources、prompts。</p>
+
+            <p>兩者可以互補:</p>
+
+            <table>
+                <thead>
+                    <tr><th>技術</th><th>適合場景</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>RAG</td><td>適合大量非結構化文件檢索</td></tr>
+                    <tr><td>MCP Resource</td><td>適合暴露明確、可命名、可治理的資料來源</td></tr>
+                    <tr><td>MCP Tool</td><td>適合執行查詢、計算、操作或 workflow</td></tr>
+                </tbody>
+            </table>
+
+            <p>例如,公司知識庫可以先用 RAG 做搜尋;但「查某張訂單最新狀態」更適合做成 tool。</p>
+
+            <h3>誤解 3:只要把所有 API 轉成 MCP tools 就完成了</h3>
+
+            <p>這是很常見、也很危險的想法。AI client 不需要一堆低階 endpoint。它需要少量、穩定、語意明確的能力。</p>
+
+            <p>如果直接把 API 轉成 tools,常會出現:</p>
+
+            <ul>
+                <li>tool 太多,LLM 不知道選哪個</li>
+                <li>endpoint 命名對人類 API 開發者清楚,對 LLM 任務語意不清楚</li>
+                <li>權限邊界不明</li>
+                <li>side effect 太容易被誤觸</li>
+                <li>response 太像系統內部格式,不適合放回對話</li>
+            </ul>
+
+            <p>比較好的方式是先問:</p>
+
+            <ul>
+                <li>AI client 要幫使用者完成什麼任務?</li>
+                <li>完成這個任務需要哪些最小能力?</li>
+                <li>每個能力是否應該是 tool、resource,還是 prompt?</li>
+            </ul>
+
+            <h3>誤解 4:MCP 是安全的,所以 tool 可以放心開</h3>
+
+            <p>MCP 提供標準化連接方式,但安全仍然要由系統設計負責。你仍然需要:authentication、authorization、input validation、audit logging、rate limiting、sensitive data filtering、human approval for high-risk actions。</p>
+
+            <div class="callout warning">
+                <div class="callout-title">提醒學生</div>
+                <p>MCP 讓 AI client 比以前更容易使用你的系統。這也代表錯誤設計的能力,會比以前更容易被誤用。</p>
+            </div>
+
+            <h3>誤解 5:FastMCP 太簡單,所以 production 應該也很簡單</h3>
+
+            <p>FastMCP 讓「寫出能跑的 server」很簡單。Production 難的是:</p>
+
+            <ul>
+                <li>能力邊界</li>
+                <li>權限模型</li>
+                <li>錯誤處理</li>
+                <li>timeout</li>
+                <li>observability</li>
+                <li>versioning</li>
+                <li>backward compatibility</li>
+                <li>tool description quality</li>
+                <li>測試與審計</li>
+            </ul>
+
+            <p>Decorator 不是工程品質的終點,只是入口。</p>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 22 ========== -->
+        <section id="ch22">
+            <span class="chapter-num">Chapter 22</span>
+            <h2>三個完整案例</h2>
+
+            <h3>案例 A:客服助理</h3>
+
+            <p><strong>需求:</strong></p>
+
+            <blockquote>
+                <p>客服希望 AI 可以查訂單狀態、查退款政策、產生回覆草稿,必要時建立內部 ticket。</p>
+            </blockquote>
+
+            <p><strong>能力設計:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>能力</th><th>類型</th><th>說明</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>get_order_status(order_id)</code></td><td>Tool</td><td>即時查詢訂單狀態</td></tr>
+                    <tr><td><code>policy://refund</code></td><td>Resource</td><td>提供退款政策</td></tr>
+                    <tr><td><code>draft_customer_reply(order_id, tone)</code></td><td>Prompt</td><td>產生客服回覆草稿</td></tr>
+                    <tr><td><code>create_support_ticket(...)</code></td><td>Tool</td><td>建立 ticket,有 side effect</td></tr>
+                </tbody>
+            </table>
+
+            <p><strong>設計提醒:</strong></p>
+
+            <ul>
+                <li><code>get_order_status</code> 回傳資料要避免包含不必要個資</li>
+                <li><code>create_support_ticket</code> 要留下審計紀錄</li>
+                <li><code>draft_customer_reply</code> 不應該直接寄信,寄信應該是另一個高風險 tool</li>
+            </ul>
+
+            <p>可能的 tool signature:</p>
+
+<pre><code class="language-python">@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment, payment, and fulfillment status for one order."""
+    ...
+
+@mcp.tool
+def create_support_ticket(
+    customer_id: str,
+    subject: str,
+    summary: str,
+    priority: str = "normal",
+) -> dict:
+    """Create a support ticket for a customer issue and return the ticket ID."""
+    ...</code></pre>
+
+            <h3>案例 B:DevOps 助理</h3>
+
+            <p><strong>需求:</strong></p>
+
+            <blockquote>
+                <p>工程師希望 AI 可以查部署狀態、查最近錯誤、讀 runbook,並產生 incident summary。</p>
+            </blockquote>
+
+            <p><strong>能力設計:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>能力</th><th>類型</th><th>說明</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>get_deployment_status(service, environment)</code></td><td>Tool</td><td>查 CI/CD 或部署平台</td></tr>
+                    <tr><td><code>search_recent_errors(service, minutes)</code></td><td>Tool</td><td>查 log 或 observability 系統</td></tr>
+                    <tr><td><code>runbook://service/{service}</code></td><td>Resource</td><td>讀服務 runbook</td></tr>
+                    <tr><td><code>incident_summary(service, incident_time)</code></td><td>Prompt</td><td>產生 incident 摘要模板</td></tr>
+                </tbody>
+            </table>
+
+            <p><strong>設計提醒:</strong></p>
+
+            <ul>
+                <li>查 log 的 tool 要限制時間範圍與筆數</li>
+                <li>production 操作如 rollback 不應第一版就開</li>
+                <li>如果要做 rollback,必須有權限與人工確認</li>
+            </ul>
+
+            <div class="callout tip">
+                <div class="callout-title">刻意保守的第一版</div>
+                <ul>
+                    <li>只讀狀態,不做修改</li>
+                    <li>只查最近 60 分鐘,不開任意查詢</li>
+                    <li>只提供 runbook,不自動執行 remediation</li>
+                </ul>
+            </div>
+
+            <h3>案例 C:資料分析助理</h3>
+
+            <p><strong>需求:</strong></p>
+
+            <blockquote>
+                <p>營運同仁希望 AI 可以查每日營收、比較區間、產生分析摘要。</p>
+            </blockquote>
+
+            <p><strong>能力設計:</strong></p>
+
+            <table>
+                <thead>
+                    <tr><th>能力</th><th>類型</th><th>說明</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><code>get_daily_revenue(date)</code></td><td>Tool</td><td>查指定日期營收</td></tr>
+                    <tr><td><code>compare_revenue(start_date, end_date)</code></td><td>Tool</td><td>比較區間資料</td></tr>
+                    <tr><td><code>metric://revenue-definition</code></td><td>Resource</td><td>指標定義</td></tr>
+                    <tr><td><code>revenue_analysis_report(period)</code></td><td>Prompt</td><td>產生分析報告模板</td></tr>
+                </tbody>
+            </table>
+
+            <p><strong>設計提醒:</strong></p>
+
+            <ul>
+                <li>不要提供 <code>run_sql(query)</code> 作為第一版能力</li>
+                <li>用明確 tool 包住允許的查詢</li>
+                <li>回傳資料要結構化,例如日期、數值、幣別、資料更新時間</li>
+                <li>指標定義用 Resource,避免 LLM 自己猜營收公式</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 23 ========== -->
+        <section id="ch23">
+            <span class="chapter-num">Chapter 23</span>
+            <h2>MCP Server 設計檢查表</h2>
+
+            <p>設計一個 MCP server 前,先過這張表。</p>
+
+            <h3>任務與範圍</h3>
+
+            <ul>
+                <li>[ ] 這個 server 服務哪一類使用者?</li>
+                <li>[ ] 它要幫 AI client 完成哪些任務?</li>
+                <li>[ ] 哪些任務明確不做?</li>
+                <li>[ ] 第一版是否可以只做 read-only 能力?</li>
+            </ul>
+
+            <h3>Tool 設計</h3>
+
+            <ul>
+                <li>[ ] tool 名稱是否是清楚的動詞片語?</li>
+                <li>[ ] 每個 tool 是否只做一件清楚的事?</li>
+                <li>[ ] 參數是否少而明確?</li>
+                <li>[ ] 是否避免使用任意字串承載複雜操作?</li>
+                <li>[ ] 是否避免 <code>*args</code> / <code>**kwargs</code>?</li>
+                <li>[ ] docstring 是否寫給 LLM 判斷使用時機?</li>
+                <li>[ ] 回傳是否是結構化資料?</li>
+            </ul>
+
+            <h3>Resource 設計</h3>
+
+            <ul>
+                <li>[ ] resource URI 是否穩定?</li>
+                <li>[ ] resource 是否 read-only?</li>
+                <li>[ ] resource 是否有清楚 mime type 或資料格式?</li>
+                <li>[ ] 是否避免回傳不必要敏感資料?</li>
+                <li>[ ] 大型資料是否需要分頁、摘要或範圍限制?</li>
+            </ul>
+
+            <h3>Prompt 設計</h3>
+
+            <ul>
+                <li>[ ] prompt 是否代表可重用的任務模板?</li>
+                <li>[ ] prompt 參數是否清楚?</li>
+                <li>[ ] prompt 是否避免硬編不存在的資料?</li>
+                <li>[ ] prompt 是否能和 tools/resources 搭配?</li>
+            </ul>
+
+            <h3>安全與治理</h3>
+
+            <ul>
+                <li>[ ] 是否有 authentication?</li>
+                <li>[ ] 是否有 authorization?</li>
+                <li>[ ] 高風險 tool 是否需要確認?</li>
+                <li>[ ] 是否記錄誰呼叫了哪個 tool?</li>
+                <li>[ ] 是否限制 rate / quota?</li>
+                <li>[ ] 是否處理 timeout?</li>
+                <li>[ ] 是否過濾敏感資料?</li>
+                <li>[ ] 是否考慮 prompt injection?</li>
+            </ul>
+
+            <h3>測試</h3>
+
+            <ul>
+                <li>[ ] 是否測 list_tools?</li>
+                <li>[ ] 是否測每個 tool 的成功案例?</li>
+                <li>[ ] 是否測錯誤輸入?</li>
+                <li>[ ] 是否測權限不足?</li>
+                <li>[ ] 是否測 side effect 沒有重複發生?</li>
+                <li>[ ] 是否測 response schema?</li>
+            </ul>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 24 ========== -->
+        <section id="ch24">
+            <span class="chapter-num">Chapter 24</span>
+            <h2>課堂互動問題</h2>
+
+            <p>這些問題適合穿插在第一堂課中,避免學生只是聽講。</p>
+
+            <h3>問題 1</h3>
+
+            <p>如果 AI 要幫工程師「查某個 service 最近 10 分鐘的錯誤率」,你會設計成 Tool 還是 Resource?</p>
+
+            <div class="callout tip">
+                <div class="callout-title">參考討論</div>
+                <p>通常是 Tool,因為它需要即時查詢 metrics 系統,並根據參數計算結果。</p>
+            </div>
+
+            <h3>問題 2</h3>
+
+            <p>如果 AI 要讀「公司請假政策」,你會設計成 Tool 還是 Resource?</p>
+
+            <div class="callout tip">
+                <div class="callout-title">參考討論</div>
+                <p>通常是 Resource,因為它是 read-only 文件,不需要執行動作。</p>
+            </div>
+
+            <h3>問題 3</h3>
+
+            <p>如果 AI 要「幫客戶取消訂閱」,這個 tool 第一版可以開嗎?</p>
+
+            <div class="callout tip">
+                <div class="callout-title">參考討論</div>
+                <p>可以設計,但不一定第一版開放。它有 side effect,需要權限、確認、審計,也可能需要 dry-run 或 preview。</p>
+            </div>
+
+            <h3>問題 4</h3>
+
+            <p>如果你有 80 個 tools,會發生什麼問題?</p>
+
+            <div class="callout tip">
+                <div class="callout-title">參考討論</div>
+                <p>LLM tool selection 可能變差。context 變大。安全審查變難。維護成本上升。應該用 toolsets、分 server、分任務域,或先收斂第一版能力。</p>
+            </div>
+
+            <h3>問題 5</h3>
+
+            <p>為什麼 docstring 不是可有可無?</p>
+
+            <div class="callout tip">
+                <div class="callout-title">參考討論</div>
+                <p>因為 tool description 是 LLM 選擇工具的重要依據。不清楚的 docstring 會導致錯用、漏用或傳錯參數。</p>
+            </div>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 25 ========== -->
+        <section id="ch25">
+            <span class="chapter-num">Chapter 25</span>
+            <h2>從概念課銜接到實作課的 Demo</h2>
+
+            <p>第一堂課最後可以用一個 10 分鐘 demo 收尾。目的不是教完整 FastMCP,而是讓學生看到:</p>
+
+            <blockquote>
+                <p>剛剛講的 capability,真的可以用很少 Python 程式碼表達。</p>
+            </blockquote>
+
+            <p>Demo 程式:</p>
+
+<pre><code class="language-python">from fastmcp import FastMCP
+
+mcp = FastMCP("Support Demo")
+
+@mcp.tool
+def get_order_status(order_id: str) -> dict:
+    """Return shipment and fulfillment status for one order."""
+    return {
+        "order_id": order_id,
+        "status": "shipped",
+        "tracking_number": "TW123456789",
+    }
+
+@mcp.resource("policy://refund")
+def refund_policy() -> str:
+    """Return the current refund policy."""
+    return "Customers can request a refund within 30 days."
+
+@mcp.prompt
+def draft_customer_reply(topic: str) -> str:
+    """Create a customer support reply draft."""
+    return f"Draft a polite and concise customer support reply about: {topic}"
+
+if __name__ == "__main__":
+    mcp.run()</code></pre>
+
+            <p><strong>講解順序:</strong></p>
+
+            <ol>
+                <li>這是 server:<code>FastMCP("Support Demo")</code></li>
+                <li>這是 tool:<code>get_order_status</code></li>
+                <li>這是 resource:<code>policy://refund</code></li>
+                <li>這是 prompt:<code>draft_customer_reply</code></li>
+                <li>type hints 和 docstring 會變成 AI client 可理解的 schema/metadata</li>
+                <li>下一堂課我們會真的跑起來、測它、再改成更像 production 的版本</li>
+            </ol>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 26 ========== -->
+        <section id="ch26">
+            <span class="chapter-num">Chapter 26</span>
+            <h2>術語表</h2>
+
+            <dl>
+                <dt><strong>MCP</strong></dt>
+                <dd><p>Model Context Protocol。AI 應用程式連接外部資料、工具與工作流程的開放標準。</p></dd>
+
+                <dt><strong>Host</strong></dt>
+                <dd><p>使用者直接互動的 AI 應用程式,例如 Claude Desktop、Cursor、VS Code、ChatGPT 或自製 agent app。</p></dd>
+
+                <dt><strong>Client</strong></dt>
+                <dd><p>Host 裡負責和某個 MCP server 通訊的元件。通常一個 client 對一個 server 連線。</p></dd>
+
+                <dt><strong>Server</strong></dt>
+                <dd><p>暴露 capabilities 的外部程式或服務。Python 工程師用 FastMCP 寫的通常就是 server。</p></dd>
+
+                <dt><strong>Tool</strong></dt>
+                <dd><p>可執行能力。通常對應 Python function,可以查詢、計算、呼叫 API 或產生 side effect。</p></dd>
+
+                <dt><strong>Resource</strong></dt>
+                <dd><p>可讀資料。通常是 read-only context,例如文件、設定、狀態、政策。</p></dd>
+
+                <dt><strong>Prompt</strong></dt>
+                <dd><p>可重用的提示模板,用來建立一致的任務流程或對話起點。</p></dd>
+
+                <dt><strong>Transport</strong></dt>
+                <dd><p>Client 和 server 的通訊方式。例如本機 <code>stdio</code> 或遠端 <code>http</code>。</p></dd>
+
+                <dt><strong>Discovery</strong></dt>
+                <dd><p>Client 向 server 詢問可用 capabilities 的過程。這是 MCP 和傳統硬編碼 API 呼叫的一個重要差異。</p></dd>
+
+                <dt><strong>Side Effect</strong></dt>
+                <dd><p>會改變外部系統狀態的操作,例如建立 ticket、寄信、退款、刪除資料、觸發部署。</p></dd>
+
+                <dt><strong>Tool Schema</strong></dt>
+                <dd><p>描述 tool 需要哪些參數、型別與格式的資料。FastMCP 會從 Python type hints 產生 schema。</p></dd>
+            </dl>
+        </section>
+
+        <hr>
+
+        <!-- ========== Chapter 27 ========== -->
+        <section id="ch27">
+            <span class="chapter-num">Chapter 27</span>
+            <h2>參考來源</h2>
+
+            <ul>
+                <li><a href="https://modelcontextprotocol.io/docs/getting-started/intro">MCP 官方介紹</a></li>
+                <li><a href="https://www.anthropic.com/news/model-context-protocol">Anthropic MCP 發布文</a></li>
+                <li><a href="https://huggingface.co/learn/mcp-course/en/unit1/introduction">Hugging Face MCP Course</a></li>
+                <li><a href="https://huggingface.co/learn/mcp-course/en/unit1/key-concepts">Hugging Face MCP Key Concepts</a></li>
+                <li><a href="https://huggingface.co/learn/mcp-course/en/unit1/architectural-components">Hugging Face MCP Architecture</a></li>
+                <li><a href="https://docs.github.com/en/copilot/concepts/context/mcp">GitHub Copilot MCP 文件</a></li>
+                <li><a href="https://learn.microsoft.com/en-us/azure/api-management/mcp-server-overview">Microsoft Azure API Management MCP</a></li>
+                <li><a href="https://www.cloudflare.com/learning/ai/what-is-model-context-protocol-mcp/">Cloudflare MCP 說明</a></li>
+                <li><a href="https://gofastmcp.com/getting-started/quickstart">FastMCP Quickstart</a></li>
+                <li><a href="https://gofastmcp.com/servers/tools">FastMCP Tools</a></li>
+                <li><a href="https://gofastmcp.com/servers/resources">FastMCP Resources</a></li>
+                <li><a href="https://gofastmcp.com/servers/prompts">FastMCP Prompts</a></li>
+                <li><a href="https://gofastmcp.com/servers/testing">FastMCP Testing</a></li>
+            </ul>
+        </section>
+
+        <footer class="book-footer">
+            <p>第一堂課:等等,這不就是 API 嗎? — MCP / FastMCP 入門</p>
+        </footer>
+
+    </main>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
